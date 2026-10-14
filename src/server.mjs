@@ -13,7 +13,7 @@ const SILENT_CATCH = /catch\s*(\([^)]*\))?\s*\{\s*(console\.(log|error|warn)\([^
 
 await run({
   name: "frontend-unslop-mcp",
-  version: "1.2.0",
+  version: "1.2.1",
   skill: "frontend-unslop",
   description: "Frontend anti-slop rules (React, Next.js, TypeScript, Tailwind, UI craft).",
   extraTools: [
