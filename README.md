@@ -68,12 +68,24 @@ Copies `frontend-unslop` into:
 
 Claude Desktop has no skills folder, so it receives the rules through the MCP prompt and the `load_*_rules` tool described below. Or install straight from this repo's `skills/` directory.
 
+## One-shot prompts: styles that actually load
+
+Generating a whole page in one prompt used to produce markup that rendered unstyled: tokens like `bg-background` were used but never defined, or the stylesheet was never imported. The skill now requires the agent to wire the stylesheet, define every token and create the Tailwind/PostCSS config in the same response, and `verify_styles_wired` checks it:
+
+| Issue | Meaning |
+| --- | --- |
+| `NO_TAILWIND_ENTRY` | Tailwind installed, but no `@import "tailwindcss"` / `@tailwind` entry CSS |
+| `STYLESHEET_NOT_IMPORTED` | Entry CSS exists but nothing imports it |
+| `UNDEFINED_TOKEN` | `bg-primary`, `text-foreground`, … used with no `--color-*` / config mapping |
+| `HTML_WITHOUT_STYLES` | Plain HTML page with no stylesheet, `<style>` or Tailwind script |
+
 ## MCP surface
 
 | Kind | Name | Purpose |
 | --- | --- | --- |
 | Prompt | `frontend-unslop` | The full skill text, for GUI clients |
 | Tool | `load_frontend_unslop_rules` | Returns the skill text (for clients without prompt support) |
+| Tool | `verify_styles_wired` | Checks the CSS actually loads: Tailwind entry stylesheet exists and is imported, and every semantic token class (`bg-background`, …) is defined |
 | Tool | `audit_frontend_slop` | Scans `files: string[]` and returns `PASS`/`FAIL` with file, line, rule and snippet |
 | Tool | `verify_typescript_compile` | Runs `tsc --noEmit` (needs `typescript` in the workspace) |
 

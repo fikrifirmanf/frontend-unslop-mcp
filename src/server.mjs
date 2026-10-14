@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { run } from "./core.mjs";
+import { verifyStylesWired } from "./styles.mjs";
 
 if (process.argv[2] === "install-skills") {
   const { installSkills } = await import("./install-skills.mjs");
@@ -11,9 +12,24 @@ const SILENT_CATCH = /catch\s*(\([^)]*\))?\s*\{\s*(console\.(log|error|warn)\([^
 
 await run({
   name: "frontend-unslop-mcp",
-  version: "1.0.0",
+  version: "1.1.0",
   skill: "frontend-unslop",
   description: "Frontend anti-slop rules (React, Next.js, TypeScript, Tailwind, UI craft).",
+  extraTools: [
+    {
+      name: "verify_styles_wired",
+      description:
+        "Verifies CSS actually loads: Tailwind entry stylesheet exists and is imported, and every semantic token class (bg-background, text-foreground, ...) used in the given files is defined. Run after generating UI, especially one-shot pages.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          files: { type: "array", items: { type: "string" }, description: "Modified UI files whose classes should be checked" },
+          projectRoot: { type: "string", description: "Relative project dir (default '.')" },
+        },
+      },
+      handler: verifyStylesWired,
+    },
+  ],
   auditTool: "audit_frontend_slop",
   auditDescription:
     "Deterministically scans React/Next.js/Tailwind files for frontend slop: type escapes, silent catch blocks, AI-purple gradients, derived-state useEffect, placeholder content.",

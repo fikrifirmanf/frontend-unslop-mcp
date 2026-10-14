@@ -83,6 +83,7 @@ export async function run(cfg) {
   const root = process.cwd();
   const skillPath = path.resolve(here, "..", "skills", cfg.skill, "SKILL.md");
   const loadSkill = () => fs.readFile(skillPath, "utf8");
+  const extra = cfg.extraTools || [];
   const filesSchema = {
     type: "object",
     properties: { files: { type: "array", items: { type: "string" }, description: "Workspace-relative file paths to audit" } },
@@ -102,6 +103,7 @@ export async function run(cfg) {
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
       { name: `load_${cfg.skill.replace(/-/g, "_")}_rules`, description: `Returns the full ${cfg.skill} ruleset. Call before writing code if the ${cfg.skill} skill is not already loaded.`, inputSchema: { type: "object", properties: {} } },
+      ...extra.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
       { name: cfg.auditTool, description: cfg.auditDescription, inputSchema: filesSchema },
       {
         name: "verify_typescript_compile",
@@ -115,6 +117,8 @@ export async function run(cfg) {
     const { name, arguments: args = {} } = req.params;
     if (name === `load_${cfg.skill.replace(/-/g, "_")}_rules`) return text(await loadSkill());
     if (name === cfg.auditTool) return audit(Array.isArray(args.files) ? args.files : [], cfg.rules, root);
+    const t = extra.find((x) => x.name === name);
+    if (t) return text(...(await t.handler(args, root)));
     if (name === "verify_typescript_compile") return tsc(args.projectRoot, root);
     throw new Error(`Unknown tool: ${name}`);
   });
