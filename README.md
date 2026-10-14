@@ -18,6 +18,12 @@ Works with **Claude Code**, **Claude Desktop**, **Codex** and **Antigravity**.
 | `NO_SILENT_CATCH` | ERROR | empty or `console.log`-only `catch` blocks |
 | `NO_AI_PURPLE_GRADIENT` | ERROR | the default indigo → purple → pink Tailwind gradient |
 | `NO_PLACEHOLDER` | ERROR | `Lorem ipsum`, `via.placeholder.com`, `// TODO` |
+| `NO_GUESSED_UNSPLASH_ID` | ERROR | remembered `images.unsplash.com/photo-…` IDs (wrong subject or 404) |
+| `NO_AMBIENT_BLUR_BLOB` | ERROR | `blur-2xl` / `blur-3xl` corner blobs |
+| `FROZEN_COUNTER_STATE` | ERROR | count-up state initialised at `useState(0)` (renders "23%" in SSR/screenshots) |
+| `HYDRATION_TRAP` | ERROR | `new Date()`, `Date.now()`, `Math.random()` rendered in JSX |
+| `INVISIBLE_INITIAL_OPACITY` | WARN | `initial={{ opacity: 0 }}` reveals that leave sections invisible |
+| `HEADING_WITHOUT_TEXT_BALANCE` | WARN | `h1`-`h3` without `text-balance` (dangling last word) |
 | `NO_HARDCODED_HEX_CLASS` | WARN | `bg-[#fff]`-style arbitrary hex instead of semantic tokens |
 | `DERIVED_STATE_USEEFFECT` | WARN | `setState` straight inside `useEffect` (derive during render instead) |
 
@@ -68,6 +74,19 @@ Copies `frontend-unslop` into:
 
 Claude Desktop has no skills folder, so it receives the rules through the MCP prompt and the `load_*_rules` tool described below. Or install straight from this repo's `skills/` directory.
 
+## Real images, not hallucinated ones
+
+LLMs guess Unsplash photo IDs, which gives wrong subjects or broken images. Give the server a key and it returns real, relevant photos:
+
+```json
+{ "mcpServers": { "frontend-unslop": {
+  "command": "npx", "args": ["-y", "frontend-unslop-mcp"],
+  "env": { "UNSPLASH_ACCESS_KEY": "your-key" }
+} } }
+```
+
+`PEXELS_API_KEY` works too. Without a key the tool returns deterministic SVG placeholders rather than guessing.
+
 ## One-shot prompts: styles that actually load
 
 Generating a whole page in one prompt used to produce markup that rendered unstyled: tokens like `bg-background` were used but never defined, or the stylesheet was never imported. The skill now requires the agent to wire the stylesheet, define every token and create the Tailwind/PostCSS config in the same response, and `verify_styles_wired` checks it:
@@ -85,6 +104,7 @@ Generating a whole page in one prompt used to produce markup that rendered unsty
 | --- | --- | --- |
 | Prompt | `frontend-unslop` | The full skill text, for GUI clients |
 | Tool | `load_frontend_unslop_rules` | Returns the skill text (for clients without prompt support) |
+| Tool | `get_verified_images` | Real image URLs + alt/credit via Unsplash or Pexels API; deterministic SVG placeholders when no key is set |
 | Tool | `verify_styles_wired` | Checks the CSS actually loads: Tailwind entry stylesheet exists and is imported, and every semantic token class (`bg-background`, …) is defined |
 | Tool | `audit_frontend_slop` | Scans `files: string[]` and returns `PASS`/`FAIL` with file, line, rule and snippet |
 | Tool | `verify_typescript_compile` | Runs `tsc --noEmit` (needs `typescript` in the workspace) |

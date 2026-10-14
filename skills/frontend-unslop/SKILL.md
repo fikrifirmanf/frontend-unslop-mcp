@@ -21,13 +21,24 @@ A page with unstyled markup is a failure. In a fresh or one-shot build, nothing 
 - **Create the config the stack needs** (`postcss.config.mjs` with `@tailwindcss/postcss` for v4; `tailwind.config` for v3) and install the packages in the same change.
 - Include the stylesheet, config and layout edits in the same response as the components, never as a follow-up.
 
-## 3. React & TypeScript (HARD BANS)
+## 3. Images, motion & layout integrity (HARD RULES)
+- **Never invent image URLs.** Do not write `images.unsplash.com/photo-...` IDs from memory; they resolve to wrong subjects (a burger on a water charity page) or 404. Call MCP tool `get_verified_images` with a descriptive `query` and use the returned URLs and `alt` verbatim. If it returns `PLACEHOLDER`, ship the SVG placeholders. Do not swap in guessed photos.
+- **No frozen counters.** Never start a count-up at `useState(0)`; an SSR render or screenshot freezes it at nonsense like "23% Transparency". Render the real target value and animate with CSS, or initialise state with the target.
+- **Safe scroll reveals.** No `initial={{ opacity: 0 }}` gated on `whileInView`. Content must be visible by default; use a subtle `y: 12 -> 0` or CSS keyframes, and respect `prefers-reduced-motion`.
+- **Aligned cards.** Every card in a grid: wrapper `flex flex-col h-full`, body `flex-1`, footer/CTA/progress `mt-auto`, so buttons share one baseline whatever the title length.
+- **Break grid monotony.** With 4+ items, do not render N identical cards: make the first a `col-span-2` featured card or give one a distinct ring/border treatment.
+- **Typography.** `text-balance` on every `h1`-`h3`, `text-pretty` on paragraphs. Left-align section headings; use full-bleed contrast bands instead of floating white cards on white.
+- **No ambient `blur-2xl/3xl` corner blobs.** Use flat colour fields.
+- **No hydration traps.** Never render `new Date()`, `Date.now()` or `Math.random()` directly in JSX.
+- **Complete pages.** Include every requested section (for example "How it works"); do not silently skip one.
+
+## 4. React & TypeScript (HARD BANS)
 - **No `useEffect` for derived state:** compute during render or with `useMemo`.
 - **No type escapes:** `: any`, `as unknown as`, `@ts-ignore`, `@ts-expect-error`, `eslint-disable`.
 - **No silent error swallowing:** no empty `catch {}` or `catch (e) { console.log(e) }`.
 - **No placeholder artifacts:** no `// TODO`, `Lorem ipsum`, `via.placeholder.com`.
 
-## 4. Mandatory verification loop
+## 5. Mandatory verification loop
 Before claiming a frontend task is complete:
 1. Call MCP tool `audit_frontend_slop` with every modified file path.
 2. Call MCP tool `verify_styles_wired` with the modified files. It confirms the stylesheet exists and is imported, and that every semantic token class is defined.
