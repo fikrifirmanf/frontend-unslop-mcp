@@ -1,22 +1,19 @@
 #!/usr/bin/env node
-import { run } from "./core.mjs";
+import { run, byExt, projectDir, typescriptCheck, summarizeChecks } from "unslop-core";
+import { rules } from "./rules.mjs";
 import { verifyStylesWired } from "./styles.mjs";
 import { getVerifiedImages } from "./images.mjs";
 
-if (process.argv[2] === "install-skills") {
-  const { installSkills } = await import("./install-skills.mjs");
-  await installSkills();
-  process.exit(0);
-}
-
-const SILENT_CATCH = /catch\s*(\([^)]*\))?\s*\{\s*(console\.(log|error|warn)\([^)]*\);?\s*)?\}/;
-
 await run({
-  name: "frontend-unslop-mcp",
-  version: "1.2.1",
+  packageUrl: new URL("../package.json", import.meta.url),
   skill: "frontend-unslop",
   description: "Frontend anti-slop rules (React, Next.js, TypeScript, Tailwind, UI craft).",
-  extraTools: [
+  auditTool: "audit_frontend_slop",
+  auditDescription:
+    "Deterministically scans React/Next.js/Tailwind files for frontend slop: type escapes, silent catches, AI-purple gradients, placeholder content, guessed image URLs, dynamic Tailwind classes, index keys, dead links, hydration traps, frozen counters and derived-state effects.",
+  rules,
+  accept: byExt(".tsx", ".jsx", ".ts", ".js", ".mjs", ".vue", ".svelte", ".astro", ".html", ".mdx"),
+  tools: [
     {
       name: "get_verified_images",
       description:
@@ -45,22 +42,15 @@ await run({
       },
       handler: verifyStylesWired,
     },
-  ],
-  auditTool: "audit_frontend_slop",
-  auditDescription:
-    "Deterministically scans React/Next.js/Tailwind files for frontend slop: type escapes, silent catch blocks, AI-purple gradients, derived-state useEffect, placeholder content.",
-  rules: [
-    { id: "NO_TYPE_ESCAPE", severity: "ERROR", regex: /:\s*any\b|\bas\s+any\b|\bas\s+unknown\s+as\b|@ts-ignore|@ts-expect-error|eslint-disable/, message: "Banned type/lint escape. Define explicit types and fix the root cause." },
-    { id: "NO_SILENT_CATCH", severity: "ERROR", regex: SILENT_CATCH, message: "Silent or console-only catch block. Surface the error state to the UI." },
-    { id: "NO_AI_PURPLE_GRADIENT", severity: "ERROR", regex: /from-(indigo|purple|violet)-[3-6]00[\s\S]{0,60}?to-(purple|pink|indigo|fuchsia)-[3-6]00/, message: "Default 'AI SaaS purple' gradient. Use project design tokens." },
-    { id: "NO_PLACEHOLDER", severity: "ERROR", regex: /via\.placeholder\.com|placehold\.co|Lorem ipsum|\/\/\s*TODO\b/i, message: "Placeholder content or TODO left in component." },
-    { id: "NO_GUESSED_UNSPLASH_ID", severity: "ERROR", regex: /images\.unsplash\.com\/photo-[\w-]+(?![\w-]*\?[^"'`\s]*ixid=)(?![\w-]*\?[^"'`\s]*ixlib=)/, message: "Unsplash photo URL not from get_verified_images (guessed IDs show wrong or broken photos). Call get_verified_images or use a placeholder." },
-    { id: "NO_AMBIENT_BLUR_BLOB", severity: "ERROR", regex: /\bblur-(2xl|3xl)\b/, message: "Ambient blurred corner blob (blur-2xl/3xl). Use flat, full-bleed contrast bands instead." },
-    { id: "FROZEN_COUNTER_STATE", severity: "ERROR", regex: /const\s*\[\s*\w*(?:count|animated|displayed?|progress|current)\w*\s*,\s*set\w+\s*\]\s*=\s*useState\(\s*0\s*\)/i, message: "Count-up state initialised at 0 renders partial nonsense (e.g. '23%') in SSR/screenshots. Render the final value and animate with CSS, or initialise with the target." },
-    { id: "INVISIBLE_INITIAL_OPACITY", severity: "WARN", regex: /initial=\{\{\s*opacity:\s*0\b/, message: "initial opacity 0 leaves sections invisible in SSR/full-page captures. Use a small y-translate with visible default, or CSS keyframes." },
-    { id: "HYDRATION_TRAP", severity: "ERROR", regex: /\{\s*(?:new\s+Date\([^)]*\)\.to\w+\(|Date\.now\(\)|Math\.random\(\))/, message: "Non-deterministic value rendered in JSX causes Next.js hydration mismatch (red '1 Issue' badge). Compute in useEffect/useState or pass from the server." },
-    { id: "HEADING_WITHOUT_TEXT_BALANCE", severity: "WARN", regex: /<h[1-3]\b[^>]*className=(?:"(?![^"]*text-balance)[^"]*"|\{`(?![^`]*text-balance)[^`]*`\})/, message: "Heading lacks text-balance; single words will dangle on the last line. Add `text-balance` (and `text-pretty` on paragraphs)." },
-    { id: "NO_HARDCODED_HEX_CLASS", severity: "WARN", regex: /\b(bg|text|border)-\[#[0-9a-fA-F]{3,8}\]/, message: "Arbitrary hex in Tailwind class. Prefer semantic tokens (bg-background, text-foreground)." },
-    { id: "DERIVED_STATE_USEEFFECT", severity: "WARN", regex: /useEffect\(\s*\(\)\s*=>\s*\{\s*set[A-Z]\w*\(/, message: "setState directly inside useEffect. Compute derived state during render / useMemo." },
+    {
+      name: "verify_typescript_compile",
+      description: "Runs the project's local `tsc --noEmit` to verify zero type errors. Reports SKIPPED if TypeScript is not installed.",
+      inputSchema: { type: "object", properties: { projectRoot: { type: "string", description: "Relative dir containing tsconfig.json (default '.')" } } },
+      handler: async (args, root) => {
+        const cwd = projectDir(root, args.projectRoot);
+        if (!cwd) return { status: "FAIL", message: "projectRoot is outside the workspace.", _failed: true };
+        return summarizeChecks([await typescriptCheck(cwd, root)]);
+      },
+    },
   ],
 });

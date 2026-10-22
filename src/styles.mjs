@@ -1,27 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { walk, projectDir } from "unslop-core";
 
-const SKIP = new Set(["node_modules", ".next", "dist", "build", ".git", ".turbo", "out", "coverage"]);
 const SRC_EXT = /\.(tsx|jsx|ts|js|mjs|html|vue|svelte|astro)$/;
 const TOKENS = "background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring";
 const TOKEN_CLASS = new RegExp(`\\b(?:bg|text|border|ring|fill|stroke|from|via|to|divide|outline|placeholder|shadow|decoration)-(${TOKENS})(?:-foreground)?\\b`, "g");
 
-async function walk(dir, depth = 0, out = []) {
-  if (depth > 6) return out;
-  for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    if (SKIP.has(e.name)) continue;
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) await walk(p, depth + 1, out);
-    else out.push(p);
-  }
-  return out;
-}
-
 export async function verifyStylesWired(args, root) {
-  const base = path.resolve(root, args.projectRoot || ".");
-  if (path.relative(root, base).startsWith("..")) return [{ status: "FAIL", message: "projectRoot is outside the workspace." }, true];
+  const base = projectDir(root, args.projectRoot);
+  if (!base) return { status: "FAIL", message: "projectRoot is outside the workspace.", _failed: true };
 
-  const all = await walk(base);
+  const all = await walk(base, () => true);
   const read = (f) => fs.readFile(f, "utf8").catch(() => "");
   const issues = [];
 
@@ -76,12 +65,13 @@ export async function verifyStylesWired(args, root) {
   }
 
   const failed = issues.length > 0;
-  return [{
+  return {
     status: failed ? "FAIL" : "PASS",
     tailwind: usesTailwind,
     entryStylesheets: entries.map((f) => path.relative(base, f)),
     tokensChecked: used.size,
     issues,
     instruction: failed ? "Fix every issue, then re-run verify_styles_wired." : "Styles are wired.",
-  }, failed];
+    _failed: failed,
+  };
 }

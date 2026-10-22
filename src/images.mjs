@@ -12,7 +12,7 @@ function svgPlaceholder(label, i, w, h) {
 
 export async function getVerifiedImages(args) {
   const query = String(args.query || "").trim();
-  if (!query) return [{ status: "FAIL", message: "query is required, e.g. 'clean water village'." }, true];
+  if (!query) return { status: "FAIL", message: "query is required, e.g. 'clean water village'.", _failed: true };
   const count = Math.min(Math.max(Number(args.count) || 4, 1), 12);
   const orientation = ["landscape", "portrait", "squarish"].includes(args.orientation) ? args.orientation : "landscape";
   const [w, h] = orientation === "portrait" ? [800, 1000] : orientation === "squarish" ? [800, 800] : [1200, 800];
@@ -25,7 +25,7 @@ export async function getVerifiedImages(args) {
       if (!r.ok) throw new Error(`Unsplash HTTP ${r.status}`);
       const j = await r.json();
       const images = j.results.map((p) => ({ url: p.urls.regular, alt: p.alt_description || p.description || query, credit: `Photo by ${p.user.name} on Unsplash`, creditUrl: p.user.links.html, width: p.width, height: p.height }));
-      if (images.length) return [{ status: "OK", source: "unsplash", query, images, instruction: "Use these URLs verbatim with their alt text. Do not substitute remembered Unsplash IDs." }, false];
+      if (images.length) return { status: "OK", source: "unsplash", query, images, instruction: "Use these URLs verbatim with their alt text, and render the credit. Do not substitute remembered Unsplash IDs." };
     } else if (process.env.PEXELS_API_KEY) {
       const u = new URL("https://api.pexels.com/v1/search");
       u.search = new URLSearchParams({ query, per_page: String(count), orientation });
@@ -33,7 +33,7 @@ export async function getVerifiedImages(args) {
       if (!r.ok) throw new Error(`Pexels HTTP ${r.status}`);
       const j = await r.json();
       const images = j.photos.map((p) => ({ url: p.src.large2x, alt: p.alt || query, credit: `Photo by ${p.photographer} on Pexels`, creditUrl: p.photographer_url, width: p.width, height: p.height }));
-      if (images.length) return [{ status: "OK", source: "pexels", query, images, instruction: "Use these URLs verbatim with their alt text." }, false];
+      if (images.length) return { status: "OK", source: "pexels", query, images, instruction: "Use these URLs verbatim with their alt text, and render the credit." };
     }
   } catch (err) {
     return fallback(query, count, w, h, `Image API failed: ${err.message}`);
@@ -43,12 +43,12 @@ export async function getVerifiedImages(args) {
 
 function fallback(query, count, w, h, reason) {
   const images = Array.from({ length: count }, (_, i) => ({ url: svgPlaceholder(query, i, w, h), alt: query, placeholder: true, width: w, height: h }));
-  return [{
+  return {
     status: "PLACEHOLDER",
     source: "local-svg",
     query,
     reason,
     images,
     instruction: "These are deterministic editorial SVG placeholders, safe to render. NEVER substitute guessed images.unsplash.com photo IDs. For real photos, set UNSPLASH_ACCESS_KEY or PEXELS_API_KEY in the MCP server env, or ask the user for assets.",
-  }, false];
+  };
 }

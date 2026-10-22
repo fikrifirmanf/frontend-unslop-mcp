@@ -37,11 +37,20 @@ A page with unstyled markup is a failure. In a fresh or one-shot build, nothing 
 - **No `useEffect` for derived state:** compute during render or with `useMemo`.
 - **No type escapes:** `: any`, `as unknown as`, `@ts-ignore`, `@ts-expect-error`, `eslint-disable`.
 - **No silent error swallowing:** no empty `catch {}` or `catch (e) { console.log(e) }`.
-- **No placeholder artifacts:** no `// TODO`, `Lorem ipsum`, `via.placeholder.com`.
+- **No placeholder artifacts:** no `// TODO`, `Lorem ipsum`, `via.placeholder.com`, `John Doe`, `Acme Inc`.
+- **Stable keys:** never `key={index}` (or `` key={`row-${i}`} ``); use the item's id.
+- **No dynamic Tailwind classes:** `` `bg-${tone}-500` `` is never generated. Map values to complete literal strings (`const tone = { ok: "bg-emerald-600", bad: "bg-red-600" }`).
+- **Real links:** no `href="#"`, empty `href` or `javascript:`. Use a route, or a `<button>` for actions.
+- **Effects that fetch abort:** create an `AbortController` and abort in the cleanup, or use the framework's loader/query library.
+- **No raw HTML injection** (`dangerouslySetInnerHTML`, `v-html`) without sanitising. JSON-LD via `JSON.stringify` is fine.
 
 ## 5. Mandatory verification loop
 Before claiming a frontend task is complete:
 1. Call MCP tool `audit_frontend_slop` with every modified file path.
 2. Call MCP tool `verify_styles_wired` with the modified files. It confirms the stylesheet exists and is imported, and that every semantic token class is defined.
 3. Call MCP tool `verify_typescript_compile`.
-4. On `status: "FAIL"`, fix every reported violation and re-run until `PASS`.
+4. On `status: "FAIL"`, fix every reported violation and re-run until `PASS`. Omitting `files` audits the git working-tree changes.
+5. A verified false positive may be suppressed with `{/* unslop-ignore RULE_ID -- reason */}` (or `// unslop-ignore ...`) on or above the line. A suppression without a reason is an ERROR.
+6. `SKIPPED` means a tool could not run (e.g. TypeScript not installed): say so, never claim it passed.
+
+For visual craft and accessibility (contrast, focus, alt text, token sprawl) also run `ui-unslop`; for user-facing text run `copy-unslop` if those servers are installed.
